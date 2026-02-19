@@ -1,0 +1,226 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: #222;
+}
+
+/* Date navigation */
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.date-nav button {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.date-nav button:hover {
+  background: #eee;
+}
+
+.date-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#date-display {
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 220px;
+  text-align: center;
+}
+
+.today-btn-wrap {
+  text-align: center;
+  margin-bottom: 1rem;
+  min-height: 32px;
+}
+
+.today-btn {
+  background: none;
+  border: none;
+  color: #2a7d4f;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.today-btn:hover {
+  background: #e8f5e9;
+}
+
+/* Past banner */
+.past-banner {
+  text-align: center;
+  color: #856404;
+  background: #fff3cd;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* Habit list */
+#habit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.habit-row {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.habit-row.checked {
+  background: #d4edda;
+  border-color: #b7dfbf;
+}
+
+.habit-checkbox {
+  width: 22px;
+  height: 22px;
+  margin-right: 0.75rem;
+  cursor: pointer;
+  accent-color: #2a7d4f;
+  flex-shrink: 0;
+}
+
+.habit-name {
+  flex: 1;
+  font-size: 0.95rem;
+  cursor: default;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.habit-edit-input {
+  flex: 1;
+  font-size: 0.95rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.habit-edit-input:focus {
+  border-color: #2a7d4f;
+}
+
+.habit-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.habit-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: #888;
+  transition: background 0.15s, color 0.15s;
+}
+
+.habit-actions button:hover {
+  background: #eee;
+  color: #333;
+}
+
+.habit-actions .delete-btn:hover {
+  background: #fdd;
+  color: #c00;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 2rem 1rem;
+  font-size: 0.95rem;
+}
+
+/* Add form */
+.add-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-form input {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.add-form input:focus {
+  border-color: #2a7d4f;
+}
+
+.add-form button {
+  background: #2a7d4f;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.add-form button:hover {
+  background: #236b42;
+}

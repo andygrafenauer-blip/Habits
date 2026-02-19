@@ -37,6 +37,16 @@
     <div class="export-wrap">
       <a href="/api/export/csv" class="export-btn" download="habits.csv">Export CSV</a>
     </div>
+
+    <div class="todo-section">
+      <h2 class="section-heading">To-Do List</h2>
+      <div id="todo-list"></div>
+      <div id="todo-empty" class="empty-state" hidden>No to-dos yet. Add one below.</div>
+      <form id="todo-form" class="add-form">
+        <input type="text" id="todo-input" placeholder="+ Add to-do..." maxlength="100" autocomplete="off">
+        <button type="submit">Add</button>
+      </form>
+    </div>
   </div>
 
   <script src="app.js"></script>

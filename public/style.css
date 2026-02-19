@@ -267,3 +267,24 @@ h1 {
   background: #eee;
   color: #333;
 }
+
+/* To-do section */
+.todo-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.section-heading {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 0.75rem;
+}
+
+#todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}

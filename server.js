@@ -13,9 +13,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 function readData() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    if (!data.todos) data.todos = [];
+    return data;
   } catch {
-    const initial = { habits: [], completions: {} };
+    const initial = { habits: [], completions: {}, todos: [] };
     writeData(initial);
     return initial;
   }
@@ -147,6 +149,41 @@ app.put('/api/day/:date', (req, res) => {
     delete data.completions[date];
   }
 
+  writeData(data);
+  res.json({ ok: true });
+});
+
+// GET /api/todos — all to-dos
+app.get('/api/todos', (req, res) => {
+  const data = readData();
+  res.json(data.todos);
+});
+
+// POST /api/todos — add a new to-do
+app.post('/api/todos', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+  const data = readData();
+  const todo = {
+    id: crypto.randomBytes(4).toString('hex'),
+    name: name.trim(),
+    createdDate: new Date().toISOString().slice(0, 10)
+  };
+  data.todos.push(todo);
+  writeData(data);
+  res.status(201).json(todo);
+});
+
+// DELETE /api/todos/:id — remove a to-do (check-off or delete)
+app.delete('/api/todos/:id', (req, res) => {
+  const data = readData();
+  const idx = data.todos.findIndex(t => t.id === req.params.id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'To-do not found' });
+  }
+  data.todos.splice(idx, 1);
   writeData(data);
   res.json({ ok: true });
 });

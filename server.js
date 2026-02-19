@@ -49,6 +49,30 @@ app.post('/api/habits', (req, res) => {
   res.status(201).json(habit);
 });
 
+// PUT /api/habits/reorder — reorder habits (must be before :id route)
+app.put('/api/habits/reorder', (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ error: 'order array is required' });
+  }
+  const data = readData();
+  const habitMap = new Map(data.habits.map(h => [h.id, h]));
+  const reordered = [];
+  for (const id of order) {
+    const h = habitMap.get(id);
+    if (h) {
+      reordered.push(h);
+      habitMap.delete(id);
+    }
+  }
+  for (const h of habitMap.values()) {
+    reordered.push(h);
+  }
+  data.habits = reordered;
+  writeData(data);
+  res.json({ ok: true });
+});
+
 // PUT /api/habits/:id — rename a habit
 app.put('/api/habits/:id', (req, res) => {
   const { name } = req.body;

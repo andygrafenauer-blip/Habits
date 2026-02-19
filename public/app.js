@@ -4,6 +4,7 @@
   // State
   let currentDate = todayStr();
   let editingId = null;
+  let dragSrcId = null;
 
   // Elements
   const dateDisplay = document.getElementById('date-display');
@@ -107,6 +108,45 @@
     habits.forEach(h => {
       const row = document.createElement('div');
       row.className = 'habit-row' + (h.completed ? ' checked' : '');
+      row.dataset.id = h.id;
+
+      // Drag handle (only on today)
+      if (currentDate === todayStr()) {
+        row.draggable = true;
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '\u2630';
+        handle.title = 'Drag to reorder';
+        row.appendChild(handle);
+
+        row.addEventListener('dragstart', (e) => {
+          dragSrcId = h.id;
+          row.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        row.addEventListener('dragend', () => {
+          dragSrcId = null;
+          row.classList.remove('dragging');
+          habitList.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+        row.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (h.id !== dragSrcId) {
+            row.classList.add('drag-over');
+          }
+        });
+        row.addEventListener('dragleave', () => {
+          row.classList.remove('drag-over');
+        });
+        row.addEventListener('drop', (e) => {
+          e.preventDefault();
+          row.classList.remove('drag-over');
+          if (dragSrcId && dragSrcId !== h.id) {
+            reorderHabits(dragSrcId, h.id);
+          }
+        });
+      }
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -193,6 +233,23 @@
   async function deleteHabit(id, name) {
     if (!confirm('Delete "' + name + '"? It will still appear on past days.')) return;
     await api('/api/habits/' + id, { method: 'DELETE' });
+    loadDay();
+  }
+
+  // Reorder habits
+  async function reorderHabits(draggedId, targetId) {
+    const rows = Array.from(habitList.querySelectorAll('.habit-row'));
+    const ids = rows.map(r => r.dataset.id);
+    const fromIdx = ids.indexOf(draggedId);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, draggedId);
+    await api('/api/habits/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: ids })
+    });
     loadDay();
   }
 

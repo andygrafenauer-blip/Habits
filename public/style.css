@@ -247,3 +247,23 @@ h1 {
 .add-form button:hover {
   background: #236b42;
 }
+
+/* Export */
+.export-wrap {
+  text-align: right;
+  margin-top: 1rem;
+}
+
+.export-btn {
+  color: #888;
+  font-size: 0.8rem;
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.export-btn:hover {
+  background: #eee;
+  color: #333;
+}

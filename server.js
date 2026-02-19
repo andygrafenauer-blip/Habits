@@ -151,6 +151,56 @@ app.put('/api/day/:date', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/export/csv — download habit data as CSV
+app.get('/api/export/csv', (req, res) => {
+  const data = readData();
+  const habits = data.habits;
+  const dates = Object.keys(data.completions).sort();
+
+  if (habits.length === 0 || dates.length === 0) {
+    res.setHeaders(new Headers({
+      'Content-Type': 'text/csv',
+      'Content-Disposition': 'attachment; filename="habits.csv"'
+    }));
+    return res.send('No data to export');
+  }
+
+  // Fill in any gaps between first and last date
+  const allDates = [];
+  const d = new Date(dates[0] + 'T12:00:00');
+  const end = new Date(dates[dates.length - 1] + 'T12:00:00');
+  while (d <= end) {
+    allDates.push(d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0'));
+    d.setDate(d.getDate() + 1);
+  }
+
+  function csvEscape(str) {
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  const header = ['Habit', ...allDates].map(csvEscape).join(',');
+  const rows = habits.map(h => {
+    const cells = [csvEscape(h.name)];
+    for (const date of allDates) {
+      const done = data.completions[date] && data.completions[date][h.id];
+      cells.push(done ? 'X' : '');
+    }
+    return cells.join(',');
+  });
+
+  const csv = [header, ...rows].join('\n');
+  res.setHeaders(new Headers({
+    'Content-Type': 'text/csv',
+    'Content-Disposition': 'attachment; filename="habits.csv"'
+  }));
+  res.send(csv);
+});
+
 app.listen(PORT, () => {
   console.log(`Habit tracker running at http://localhost:${PORT}`);
 });

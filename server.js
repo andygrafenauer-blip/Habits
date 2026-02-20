@@ -3,7 +3,7 @@ const path = require('path');
 const db = require('./db');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -153,6 +153,6 @@ app.get('/api/export/csv', (req, res) => {
   res.send(csv);
 });
 
-app.listen(PORT, () => {
-  console.log(`Habit tracker running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Habit tracker running on port ${PORT}`);
 });

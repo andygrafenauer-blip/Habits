@@ -1,40 +1,16 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const db = require('./db');
 
 const app = express();
 const PORT = 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-function readData() {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    const data = JSON.parse(raw);
-    if (!data.todos) {
-      data.todos = { work: [], home: [] };
-    } else if (Array.isArray(data.todos)) {
-      data.todos = { work: data.todos, home: [] };
-    }
-    return data;
-  } catch {
-    const initial = { habits: [], completions: {}, todos: { work: [], home: [] } };
-    writeData(initial);
-    return initial;
-  }
-}
-
-function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
 // GET /api/habits — all habits (active + deleted)
 app.get('/api/habits', (req, res) => {
-  const data = readData();
-  res.json(data.habits);
+  res.json(db.getHabits());
 });
 
 // POST /api/habits — add a new habit
@@ -43,16 +19,7 @@ app.post('/api/habits', (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
   }
-  const data = readData();
-  const habit = {
-    id: crypto.randomBytes(4).toString('hex'),
-    name: name.trim(),
-    createdDate: new Date().toISOString().slice(0, 10),
-    deleted: false
-  };
-  data.habits.push(habit);
-  writeData(data);
-  res.status(201).json(habit);
+  res.status(201).json(db.addHabit(name.trim()));
 });
 
 // PUT /api/habits/reorder — reorder habits (must be before :id route)
@@ -61,21 +28,7 @@ app.put('/api/habits/reorder', (req, res) => {
   if (!Array.isArray(order)) {
     return res.status(400).json({ error: 'order array is required' });
   }
-  const data = readData();
-  const habitMap = new Map(data.habits.map(h => [h.id, h]));
-  const reordered = [];
-  for (const id of order) {
-    const h = habitMap.get(id);
-    if (h) {
-      reordered.push(h);
-      habitMap.delete(id);
-    }
-  }
-  for (const h of habitMap.values()) {
-    reordered.push(h);
-  }
-  data.habits = reordered;
-  writeData(data);
+  db.reorderHabits(order);
   res.json({ ok: true });
 });
 
@@ -85,48 +38,25 @@ app.put('/api/habits/:id', (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
   }
-  const data = readData();
-  const habit = data.habits.find(h => h.id === req.params.id);
+  const habit = db.renameHabit(req.params.id, name.trim());
   if (!habit) {
     return res.status(404).json({ error: 'Habit not found' });
   }
-  habit.name = name.trim();
-  writeData(data);
   res.json(habit);
 });
 
 // DELETE /api/habits/:id — soft-delete a habit
 app.delete('/api/habits/:id', (req, res) => {
-  const data = readData();
-  const habit = data.habits.find(h => h.id === req.params.id);
+  const habit = db.deleteHabit(req.params.id);
   if (!habit) {
     return res.status(404).json({ error: 'Habit not found' });
   }
-  habit.deleted = true;
-  habit.deletedDate = new Date().toISOString().slice(0, 10);
-  writeData(data);
   res.json(habit);
 });
 
 // GET /api/day/:date — habits visible on that day + completions
 app.get('/api/day/:date', (req, res) => {
-  const date = req.params.date;
-  const data = readData();
-  const dayCompletions = data.completions[date] || {};
-
-  const visible = data.habits.filter(h => {
-    if (h.deleted && h.deletedDate <= date) return false;
-    return true;
-  });
-
-  const result = visible.map(h => ({
-    id: h.id,
-    name: h.name,
-    completed: !!dayCompletions[h.id],
-    deleted: h.deleted
-  }));
-
-  res.json(result);
+  res.json(db.getDayView(req.params.date));
 });
 
 // PUT /api/day/:date — toggle a habit completion
@@ -135,25 +65,7 @@ app.put('/api/day/:date', (req, res) => {
   if (!habitId) {
     return res.status(400).json({ error: 'habitId is required' });
   }
-  const date = req.params.date;
-  const data = readData();
-
-  if (!data.completions[date]) {
-    data.completions[date] = {};
-  }
-
-  if (completed) {
-    data.completions[date][habitId] = true;
-  } else {
-    delete data.completions[date][habitId];
-  }
-
-  // Clean up empty date entries
-  if (Object.keys(data.completions[date]).length === 0) {
-    delete data.completions[date];
-  }
-
-  writeData(data);
+  db.toggleCompletion(req.params.date, habitId, completed);
   res.json({ ok: true });
 });
 
@@ -163,8 +75,7 @@ app.get('/api/todos/:list', (req, res) => {
   if (list !== 'work' && list !== 'home') {
     return res.status(400).json({ error: 'Invalid list: must be "work" or "home"' });
   }
-  const data = readData();
-  res.json(data.todos[list]);
+  res.json(db.getTodos(list));
 });
 
 // POST /api/todos/:list — add a new to-do to a list
@@ -177,15 +88,7 @@ app.post('/api/todos/:list', (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
   }
-  const data = readData();
-  const todo = {
-    id: crypto.randomBytes(4).toString('hex'),
-    name: name.trim(),
-    createdDate: new Date().toISOString().slice(0, 10)
-  };
-  data.todos[list].push(todo);
-  writeData(data);
-  res.status(201).json(todo);
+  res.status(201).json(db.addTodo(list, name.trim()));
 });
 
 // DELETE /api/todos/:list/:id — remove a to-do from a list
@@ -194,21 +97,17 @@ app.delete('/api/todos/:list/:id', (req, res) => {
   if (list !== 'work' && list !== 'home') {
     return res.status(400).json({ error: 'Invalid list: must be "work" or "home"' });
   }
-  const data = readData();
-  const idx = data.todos[list].findIndex(t => t.id === req.params.id);
-  if (idx === -1) {
+  const removed = db.removeTodo(list, req.params.id);
+  if (!removed) {
     return res.status(404).json({ error: 'To-do not found' });
   }
-  data.todos[list].splice(idx, 1);
-  writeData(data);
   res.json({ ok: true });
 });
 
 // GET /api/export/csv — download habit data as CSV
 app.get('/api/export/csv', (req, res) => {
-  const data = readData();
-  const habits = data.habits;
-  const dates = Object.keys(data.completions).sort();
+  const { habits, completions } = db.getExportData();
+  const dates = Object.keys(completions).sort();
 
   if (habits.length === 0 || dates.length === 0) {
     res.setHeaders(new Headers({
@@ -240,7 +139,7 @@ app.get('/api/export/csv', (req, res) => {
   const rows = habits.map(h => {
     const cells = [csvEscape(h.name)];
     for (const date of allDates) {
-      const done = data.completions[date] && data.completions[date][h.id];
+      const done = completions[date] && completions[date][h.id];
       cells.push(done ? 'X' : '');
     }
     return cells.join(',');

@@ -267,80 +267,86 @@
     loadDay();
   });
 
-  // To-do elements
-  const todoList = document.getElementById('todo-list');
-  const todoEmpty = document.getElementById('todo-empty');
-  const todoForm = document.getElementById('todo-form');
-  const todoInput = document.getElementById('todo-input');
+  // To-do list setup (reusable for work and home)
+  function setupTodoList(listName) {
+    const listEl = document.getElementById('todo-list-' + listName);
+    const emptyEl = document.getElementById('todo-empty-' + listName);
+    const form = document.querySelector('form[data-list="' + listName + '"]');
+    const input = form.querySelector('input');
 
-  // Load and render to-dos
-  async function loadTodos() {
-    const todos = await api('/api/todos');
-    renderTodos(todos);
-  }
-
-  function renderTodos(todos) {
-    todoList.innerHTML = '';
-
-    if (todos.length === 0) {
-      todoEmpty.hidden = false;
-      return;
+    async function loadTodos() {
+      const todos = await api('/api/todos/' + listName);
+      renderTodos(todos);
     }
 
-    todoEmpty.hidden = true;
+    function renderTodos(todos) {
+      listEl.innerHTML = '';
 
-    todos.forEach(t => {
-      const row = document.createElement('div');
-      row.className = 'habit-row';
-      row.dataset.id = t.id;
+      if (todos.length === 0) {
+        emptyEl.hidden = false;
+        return;
+      }
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'habit-checkbox';
-      checkbox.addEventListener('change', () => removeTodo(t.id));
+      emptyEl.hidden = true;
 
-      const name = document.createElement('span');
-      name.className = 'habit-name';
-      name.textContent = t.name;
+      todos.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'habit-row';
+        row.dataset.id = t.id;
 
-      const actions = document.createElement('div');
-      actions.className = 'habit-actions';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'habit-checkbox';
+        checkbox.addEventListener('change', () => removeTodo(t.id));
 
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'delete-btn';
-      deleteBtn.textContent = '\u00d7';
-      deleteBtn.title = 'Delete to-do';
-      deleteBtn.addEventListener('click', () => removeTodo(t.id));
+        const name = document.createElement('span');
+        name.className = 'habit-name';
+        name.textContent = t.name;
 
-      actions.appendChild(deleteBtn);
-      row.appendChild(checkbox);
-      row.appendChild(name);
-      row.appendChild(actions);
-      todoList.appendChild(row);
+        const actions = document.createElement('div');
+        actions.className = 'habit-actions';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = '\u00d7';
+        deleteBtn.title = 'Delete to-do';
+        deleteBtn.addEventListener('click', () => removeTodo(t.id));
+
+        actions.appendChild(deleteBtn);
+        row.appendChild(checkbox);
+        row.appendChild(name);
+        row.appendChild(actions);
+        listEl.appendChild(row);
+      });
+    }
+
+    async function removeTodo(id) {
+      await api('/api/todos/' + listName + '/' + id, { method: 'DELETE' });
+      loadTodos();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = input.value.trim();
+      if (!name) return;
+      await api('/api/todos/' + listName, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      input.value = '';
+      loadTodos();
     });
+
+    return { load: loadTodos };
   }
 
-  async function removeTodo(id) {
-    await api('/api/todos/' + id, { method: 'DELETE' });
-    loadTodos();
-  }
-
-  // Add to-do
-  todoForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = todoInput.value.trim();
-    if (!name) return;
-    await api('/api/todos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    todoInput.value = '';
-    loadTodos();
-  });
+  const workList = setupTodoList('work');
+  const homeList = setupTodoList('home');
 
   // Init
   updateNav();
   loadDay();
-  loadTodos();
+  workList.load();
+  homeList.load();
 })();

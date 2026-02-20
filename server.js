@@ -14,10 +14,14 @@ function readData() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
     const data = JSON.parse(raw);
-    if (!data.todos) data.todos = [];
+    if (!data.todos) {
+      data.todos = { work: [], home: [] };
+    } else if (Array.isArray(data.todos)) {
+      data.todos = { work: data.todos, home: [] };
+    }
     return data;
   } catch {
-    const initial = { habits: [], completions: {}, todos: [] };
+    const initial = { habits: [], completions: {}, todos: { work: [], home: [] } };
     writeData(initial);
     return initial;
   }
@@ -153,14 +157,22 @@ app.put('/api/day/:date', (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/todos — all to-dos
-app.get('/api/todos', (req, res) => {
+// GET /api/todos/:list — all to-dos for a list
+app.get('/api/todos/:list', (req, res) => {
+  const { list } = req.params;
+  if (list !== 'work' && list !== 'home') {
+    return res.status(400).json({ error: 'Invalid list: must be "work" or "home"' });
+  }
   const data = readData();
-  res.json(data.todos);
+  res.json(data.todos[list]);
 });
 
-// POST /api/todos — add a new to-do
-app.post('/api/todos', (req, res) => {
+// POST /api/todos/:list — add a new to-do to a list
+app.post('/api/todos/:list', (req, res) => {
+  const { list } = req.params;
+  if (list !== 'work' && list !== 'home') {
+    return res.status(400).json({ error: 'Invalid list: must be "work" or "home"' });
+  }
   const { name } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
@@ -171,19 +183,23 @@ app.post('/api/todos', (req, res) => {
     name: name.trim(),
     createdDate: new Date().toISOString().slice(0, 10)
   };
-  data.todos.push(todo);
+  data.todos[list].push(todo);
   writeData(data);
   res.status(201).json(todo);
 });
 
-// DELETE /api/todos/:id — remove a to-do (check-off or delete)
-app.delete('/api/todos/:id', (req, res) => {
+// DELETE /api/todos/:list/:id — remove a to-do from a list
+app.delete('/api/todos/:list/:id', (req, res) => {
+  const { list } = req.params;
+  if (list !== 'work' && list !== 'home') {
+    return res.status(400).json({ error: 'Invalid list: must be "work" or "home"' });
+  }
   const data = readData();
-  const idx = data.todos.findIndex(t => t.id === req.params.id);
+  const idx = data.todos[list].findIndex(t => t.id === req.params.id);
   if (idx === -1) {
     return res.status(404).json({ error: 'To-do not found' });
   }
-  data.todos.splice(idx, 1);
+  data.todos[list].splice(idx, 1);
   writeData(data);
   res.json({ ok: true });
 });

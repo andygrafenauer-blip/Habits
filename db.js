@@ -113,6 +113,61 @@ function removeTodo(list, id) {
   return info.changes > 0;
 }
 
+// --- Streaks ---
+
+function getStreaks(date) {
+  const today = new Date().toISOString().slice(0, 10);
+  const isToday = date === today;
+
+  // Get visible habits for this date
+  const habits = db.prepare(`
+    SELECT id, name FROM habits
+    WHERE NOT (deleted = 1 AND deleted_date <= ?)
+    ORDER BY sort_order
+  `).all(date);
+
+  const checkCompletion = db.prepare('SELECT 1 FROM completions WHERE date = ? AND habit_id = ?');
+
+  function shiftDate(dateStr, days) {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  const results = [];
+
+  for (const habit of habits) {
+    let streak = 0;
+    const doneOnDate = !!checkCompletion.get(date, habit.id);
+
+    let checkDay;
+    if (doneOnDate) {
+      checkDay = date;
+    } else if (isToday) {
+      // Day isn't over yet, start counting from yesterday
+      checkDay = shiftDate(date, -1);
+    } else {
+      // Past day and not completed — no streak
+      continue;
+    }
+
+    // Walk backwards counting consecutive days
+    while (checkCompletion.get(checkDay, habit.id)) {
+      streak++;
+      checkDay = shiftDate(checkDay, -1);
+    }
+
+    if (streak > 0) {
+      results.push({ id: habit.id, name: habit.name, streak });
+    }
+  }
+
+  results.sort((a, b) => b.streak - a.streak);
+  return results;
+}
+
 // --- Export ---
 
 function getExportData() {
@@ -128,6 +183,7 @@ function getExportData() {
 module.exports = {
   getHabits, addHabit, renameHabit, deleteHabit, reorderHabits,
   getDayView, toggleCompletion,
+  getStreaks,
   getTodos, addTodo, removeTodo,
   getExportData
 };

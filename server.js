@@ -69,6 +69,11 @@ app.put('/api/day/:date', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/streaks/:date — current streaks as of a date
+app.get('/api/streaks/:date', (req, res) => {
+  res.json(db.getStreaks(req.params.date));
+});
+
 // GET /api/todos/:list — all to-dos for a list
 app.get('/api/todos/:list', (req, res) => {
   const { list } = req.params;

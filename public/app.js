@@ -12,6 +12,8 @@
   const nextBtn = document.getElementById('next-day');
   const todayBtn = document.getElementById('today-btn');
   const pastBanner = document.getElementById('past-banner');
+  const streaksSection = document.getElementById('streaks-section');
+  const streaksList = document.getElementById('streaks-list');
   const habitList = document.getElementById('habit-list');
   const emptyState = document.getElementById('empty-state');
   const addForm = document.getElementById('add-form');
@@ -93,6 +95,33 @@
   async function loadDay() {
     const habits = await api('/api/day/' + currentDate);
     render(habits);
+    loadStreaks();
+  }
+
+  async function loadStreaks() {
+    const streaks = await api('/api/streaks/' + currentDate);
+    streaksList.innerHTML = '';
+    if (streaks.length === 0) {
+      streaksSection.hidden = true;
+      return;
+    }
+    streaksSection.hidden = false;
+    streaks.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'streak-row';
+
+      const name = document.createElement('span');
+      name.className = 'streak-name';
+      name.textContent = s.name;
+
+      const count = document.createElement('span');
+      count.className = 'streak-count';
+      count.textContent = s.streak + (s.streak === 1 ? ' day' : ' days');
+
+      row.appendChild(name);
+      row.appendChild(count);
+      streaksList.appendChild(row);
+    });
   }
 
   function render(habits) {

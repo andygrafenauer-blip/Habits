@@ -96,6 +96,47 @@ h1 {
   margin-bottom: 1rem;
 }
 
+/* Streaks section */
+.streaks-section {
+  background: #f0f7f3;
+  border: 1px solid #d4e8dc;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.streaks-heading {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2a7d4f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.streak-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.88rem;
+  color: #444;
+}
+
+.streak-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 0.75rem;
+}
+
+.streak-count {
+  font-weight: 600;
+  color: #2a7d4f;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Habit list */
 #habit-list {
   display: flex;

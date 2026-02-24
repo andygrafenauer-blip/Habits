@@ -30,6 +30,13 @@ db.exec(`
     name TEXT NOT NULL,
     created_date TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS achievements (
+    type TEXT NOT NULL,
+    habit_id TEXT,
+    earned_date TEXT NOT NULL,
+    UNIQUE(type, habit_id, earned_date)
+  );
 `);
 
 // --- Habits ---
@@ -168,6 +175,194 @@ function getStreaks(date) {
   return results;
 }
 
+// --- Achievements ---
+
+function shiftDateStr(dateStr, days) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+const insertAchievement = db.prepare(
+  'INSERT OR IGNORE INTO achievements (type, habit_id, earned_date) VALUES (?, ?, ?)'
+);
+
+const removeInvalidAchievements = db.transaction((date, habitId) => {
+  // Perfect day: this habit is now unchecked, so the day can't be perfect
+  db.prepare('DELETE FROM achievements WHERE type = ? AND habit_id IS NULL AND earned_date = ?')
+    .run('perfect_day', date);
+
+  // Per-habit streaks: a streak_N earned on date E included date D if E-(N-1) <= D <= E
+  // So any earned_date from D to D+(N-1) could have relied on D
+  for (const [type, n] of [['streak_7', 7], ['streak_14', 14], ['streak_21', 21]]) {
+    const endDate = shiftDateStr(date, n - 1);
+    db.prepare('DELETE FROM achievements WHERE type = ? AND habit_id = ? AND earned_date >= ? AND earned_date <= ?')
+      .run(type, habitId, date, endDate);
+  }
+
+  // Global streaks: same window logic
+  for (const [type, n] of [['streak_7', 7], ['streak_14', 14], ['streak_21', 21]]) {
+    const endDate = shiftDateStr(date, n - 1);
+    db.prepare('DELETE FROM achievements WHERE type = ? AND habit_id IS NULL AND earned_date >= ? AND earned_date <= ?')
+      .run(type, date, endDate);
+  }
+
+  // Perfect month: remove for the month containing this date (both per-habit and global)
+  const monthStr = date.slice(0, 7) + '-01';
+  db.prepare('DELETE FROM achievements WHERE type = ? AND habit_id = ? AND earned_date = ?')
+    .run('perfect_month', habitId, monthStr);
+  db.prepare('DELETE FROM achievements WHERE type = ? AND habit_id IS NULL AND earned_date = ?')
+    .run('perfect_month', monthStr);
+});
+
+const checkAchievements = db.transaction((date) => {
+  // Get active habits for this date
+  const habits = db.prepare(`
+    SELECT id FROM habits
+    WHERE created_date <= ? AND NOT (deleted = 1 AND deleted_date <= ?)
+  `).all(date, date);
+
+  if (habits.length === 0) return;
+
+  const habitIds = habits.map(h => h.id);
+  const checkCompletion = db.prepare(
+    'SELECT 1 FROM completions WHERE date = ? AND habit_id = ?'
+  );
+
+  // --- Perfect Day ---
+  const allDone = habitIds.every(id => !!checkCompletion.get(date, id));
+  if (allDone) {
+    insertAchievement.run('perfect_day', null, date);
+  }
+
+  // --- Per-habit streaks ---
+  for (const id of habitIds) {
+    let streak = 0;
+    let checkDay = date;
+    while (checkCompletion.get(checkDay, id)) {
+      streak++;
+      checkDay = shiftDateStr(checkDay, -1);
+    }
+    if (streak >= 7) insertAchievement.run('streak_7', id, date);
+    if (streak >= 14) insertAchievement.run('streak_14', id, date);
+    if (streak >= 21) insertAchievement.run('streak_21', id, date);
+  }
+
+  // --- Global streaks ---
+  for (const threshold of [7, 14, 21]) {
+    let allStreak = true;
+    for (let i = 0; i < threshold; i++) {
+      const checkDay = shiftDateStr(date, -i);
+      const dayHabits = db.prepare(`
+        SELECT id FROM habits
+        WHERE created_date <= ? AND NOT (deleted = 1 AND deleted_date <= ?)
+      `).all(checkDay, checkDay);
+      if (dayHabits.length === 0) { allStreak = false; break; }
+      const allCompleted = dayHabits.every(h => !!checkCompletion.get(checkDay, h.id));
+      if (!allCompleted) { allStreak = false; break; }
+    }
+    if (allStreak) {
+      insertAchievement.run('streak_' + threshold, null, date);
+    }
+  }
+
+  // --- Perfect Month (only fully elapsed months) ---
+  const [year, month] = date.split('-').map(Number);
+  // Check previous month (the most recently elapsed)
+  let checkYear = month === 1 ? year - 1 : year;
+  let checkMonth = month === 1 ? 12 : month - 1;
+  const days = daysInMonth(checkYear, checkMonth);
+  const monthStr = checkYear + '-' + String(checkMonth).padStart(2, '0');
+  const firstOfMonth = monthStr + '-01';
+
+  // Per-habit perfect month
+  for (const id of habitIds) {
+    // Check if habit existed for the whole month
+    const habitRow = db.prepare('SELECT created_date FROM habits WHERE id = ?').get(id);
+    if (habitRow.created_date > firstOfMonth) continue;
+    let perfect = true;
+    for (let d = 1; d <= days; d++) {
+      const dayStr = monthStr + '-' + String(d).padStart(2, '0');
+      if (!checkCompletion.get(dayStr, id)) { perfect = false; break; }
+    }
+    if (perfect) {
+      insertAchievement.run('perfect_month', id, firstOfMonth);
+    }
+  }
+
+  // Global perfect month
+  let globalPerfect = true;
+  for (let d = 1; d <= days; d++) {
+    const dayStr = monthStr + '-' + String(d).padStart(2, '0');
+    const dayHabits = db.prepare(`
+      SELECT id FROM habits
+      WHERE created_date <= ? AND NOT (deleted = 1 AND deleted_date <= ?)
+    `).all(dayStr, dayStr);
+    if (dayHabits.length === 0) { globalPerfect = false; break; }
+    const allCompleted = dayHabits.every(h => !!checkCompletion.get(dayStr, h.id));
+    if (!allCompleted) { globalPerfect = false; break; }
+  }
+  if (globalPerfect) {
+    insertAchievement.run('perfect_month', null, firstOfMonth);
+  }
+});
+
+function getAchievements() {
+  const globalRows = db.prepare(`
+    SELECT type, COUNT(*) AS count, MAX(earned_date) AS latestDate
+    FROM achievements WHERE habit_id IS NULL
+    GROUP BY type
+  `).all();
+
+  const globalMap = {};
+  for (const r of globalRows) {
+    globalMap[r.type] = { type: r.type, count: r.count, latestDate: r.latestDate };
+  }
+
+  const globalTypes = ['perfect_day', 'streak_7', 'streak_14', 'streak_21', 'perfect_month'];
+  const global = globalTypes.map(t => globalMap[t] || { type: t, count: 0, latestDate: null });
+
+  const perHabitRows = db.prepare(`
+    SELECT a.type, a.habit_id, COUNT(*) AS count, MAX(a.earned_date) AS latestDate, h.name
+    FROM achievements a
+    JOIN habits h ON h.id = a.habit_id
+    WHERE a.habit_id IS NOT NULL
+    GROUP BY a.type, a.habit_id
+  `).all();
+
+  const perHabit = {};
+  for (const r of perHabitRows) {
+    if (!perHabit[r.habit_id]) {
+      perHabit[r.habit_id] = { name: r.name, achievements: {} };
+    }
+    perHabit[r.habit_id].achievements[r.type] = {
+      type: r.type, count: r.count, latestDate: r.latestDate
+    };
+  }
+
+  // Include all active habits even without achievements
+  const habits = db.prepare('SELECT id, name FROM habits WHERE deleted = 0 ORDER BY sort_order').all();
+  const perHabitTypes = ['streak_7', 'streak_14', 'streak_21', 'perfect_month'];
+  const result = {};
+  for (const h of habits) {
+    const existing = perHabit[h.id] || { name: h.name, achievements: {} };
+    result[h.id] = {
+      name: h.name,
+      achievements: perHabitTypes.map(t =>
+        existing.achievements[t] || { type: t, count: 0, latestDate: null }
+      )
+    };
+  }
+
+  return { global, perHabit: result };
+}
+
 // --- Export ---
 
 function getExportData() {
@@ -184,6 +379,7 @@ module.exports = {
   getHabits, addHabit, renameHabit, deleteHabit, reorderHabits,
   getDayView, toggleCompletion,
   getStreaks,
+  checkAchievements, removeInvalidAchievements, getAchievements,
   getTodos, addTodo, removeTodo,
   getExportData
 };

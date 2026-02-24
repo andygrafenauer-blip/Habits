@@ -238,6 +238,120 @@
     });
   }
 
+  // Achievements
+  const achievementsSection = document.getElementById('achievements-section');
+  const achievementsGlobal = document.getElementById('achievements-global');
+  const achievementsPerHabit = document.getElementById('achievements-per-habit');
+
+  const achievementLabels = {
+    perfect_day: 'Perfect Day',
+    streak_7: '7-Day Streak',
+    streak_14: '14-Day Streak',
+    streak_21: '21-Day Streak',
+    perfect_month: 'Perfect Month'
+  };
+
+  const collapsedGroups = {};
+
+  function makeCollapsibleGroup(title, key) {
+    const el = document.createElement('div');
+    el.className = 'achievements-group';
+
+    const header = document.createElement('div');
+    header.className = 'achievements-group-title';
+
+    const chevron = document.createElement('span');
+    chevron.className = 'achievements-chevron';
+    chevron.textContent = '\u25B6';
+
+    const label = document.createElement('span');
+    label.textContent = title;
+
+    header.appendChild(chevron);
+    header.appendChild(label);
+
+    const content = document.createElement('div');
+    content.className = 'achievements-group-content';
+
+    const collapsed = !!collapsedGroups[key];
+    if (collapsed) {
+      content.hidden = true;
+      chevron.classList.add('collapsed');
+    } else {
+      chevron.classList.add('expanded');
+    }
+
+    header.addEventListener('click', () => {
+      const isHidden = content.hidden;
+      content.hidden = !isHidden;
+      collapsedGroups[key] = !isHidden;
+      chevron.classList.toggle('collapsed', !isHidden);
+      chevron.classList.toggle('expanded', isHidden);
+    });
+
+    el.appendChild(header);
+    el.appendChild(content);
+    return { el, content };
+  }
+
+  async function loadAchievements() {
+    const data = await api('/api/achievements');
+    const hasAny = data.global.some(a => a.count > 0) ||
+      Object.values(data.perHabit).some(h => h.achievements.some(a => a.count > 0));
+
+    achievementsSection.hidden = false;
+    achievementsGlobal.innerHTML = '';
+    achievementsPerHabit.innerHTML = '';
+
+    // Global section (collapsible)
+    const globalGroup = makeCollapsibleGroup('Global', 'achievements-global-group');
+    data.global.forEach(a => {
+      globalGroup.content.appendChild(makeAchievementRow(a));
+    });
+    achievementsGlobal.appendChild(globalGroup.el);
+
+    // Per-habit sections (each collapsible)
+    const habitIds = Object.keys(data.perHabit);
+    if (habitIds.length > 0) {
+      habitIds.forEach(id => {
+        const habit = data.perHabit[id];
+        const group = makeCollapsibleGroup(habit.name, 'achievements-habit-' + id);
+        habit.achievements.forEach(a => {
+          group.content.appendChild(makeAchievementRow(a));
+        });
+        achievementsPerHabit.appendChild(group.el);
+      });
+    }
+  }
+
+  function makeAchievementRow(a) {
+    const row = document.createElement('div');
+    row.className = 'achievement-row' + (a.count > 0 ? ' earned' : '');
+
+    const indicator = document.createElement('div');
+    indicator.className = 'achievement-indicator';
+    indicator.textContent = a.count > 0 ? '\u2713' : '';
+
+    const name = document.createElement('span');
+    name.className = 'achievement-name';
+    name.textContent = achievementLabels[a.type] || a.type;
+
+    row.appendChild(indicator);
+    row.appendChild(name);
+
+    if (a.count > 0) {
+      const meta = document.createElement('span');
+      meta.className = 'achievement-meta';
+      const parts = [];
+      if (a.count > 1) parts.push(a.count + 'x');
+      if (a.latestDate) parts.push(a.latestDate);
+      meta.textContent = parts.join(' \u00b7 ');
+      row.appendChild(meta);
+    }
+
+    return row;
+  }
+
   // Actions
   async function toggleHabit(habitId, completed) {
     await api('/api/day/' + currentDate, {
@@ -246,6 +360,7 @@
       body: JSON.stringify({ habitId, completed })
     });
     loadDay();
+    loadAchievements();
   }
 
   async function renameHabit(id, newName) {
@@ -376,6 +491,7 @@
   // Init
   updateNav();
   loadDay();
+  loadAchievements();
   workList.load();
   homeList.load();
 })();

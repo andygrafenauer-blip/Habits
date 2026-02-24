@@ -66,7 +66,17 @@ app.put('/api/day/:date', (req, res) => {
     return res.status(400).json({ error: 'habitId is required' });
   }
   db.toggleCompletion(req.params.date, habitId, completed);
+  if (completed) {
+    db.checkAchievements(req.params.date);
+  } else {
+    db.removeInvalidAchievements(req.params.date, habitId);
+  }
   res.json({ ok: true });
+});
+
+// GET /api/achievements — all earned achievements
+app.get('/api/achievements', (req, res) => {
+  res.json(db.getAchievements());
 });
 
 // GET /api/streaks/:date — current streaks as of a date
